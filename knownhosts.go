@@ -194,6 +194,12 @@ func (hkdb *HostKeyDB) HostKeys(hostWithPort string) (keys []PublicKey) {
 // in the known_hosts file will properly be converted to the corresponding
 // ssh.CertAlgo* values.
 func (hkdb *HostKeyDB) HostKeyAlgorithms(hostWithPort string) (algos []string) {
+	return hkdb.hostKeyAlgorithms(hostWithPort, func(PublicKey) bool { return true })
+}
+
+type HostKeyFilter func(PublicKey) bool
+
+func (hkdb *HostKeyDB) hostKeyAlgorithms(hostWithPort string, filter HostKeyFilter) (algos []string) {
 	// We ensure that the return value never contains duplicates. This is needed
 	// since golang.org/x/crypto/ssh/knownhosts can now return multiple keys of
 	// the same type after https://github.com/golang/crypto/pull/254 was merged.
@@ -209,6 +215,10 @@ func (hkdb *HostKeyDB) HostKeyAlgorithms(hostWithPort string) (algos []string) {
 		}
 	}
 	for _, key := range hostKeys {
+		if !filter(key) {
+			continue
+		}
+
 		typ := key.Type()
 		if typ == ssh.KeyAlgoRSA {
 			// KeyAlgoRSASHA256 and KeyAlgoRSASHA512 are only public key algorithms,
@@ -246,6 +256,10 @@ func keyTypeToCertAlgo(keyType string) string {
 		return ssh.CertAlgoSKED25519v01
 	}
 	return ""
+}
+
+func (hkdb *HostKeyDB) FilteredHostKeyAlgorithms(hostWithPort string, filter HostKeyFilter) (algos []string) {
+	return hkdb.hostKeyAlgorithms(hostWithPort, filter)
 }
 
 // HostKeyCallback wraps ssh.HostKeyCallback with additional methods to
